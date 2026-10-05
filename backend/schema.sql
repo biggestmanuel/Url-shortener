@@ -25,8 +25,17 @@ create table if not exists sessions (
   created_at timestamptz not null default now()
 );
 
-create index if not exists sessions_token_hash_idx on sessions (token_hash);
+-- No sessions_token_hash_idx: `token_hash text unique` already creates
+-- sessions_token_hash_key. Declaring both meant every session INSERT — the
+-- hottest write in the app — maintained two identical b-trees. Dropped here so
+-- re-running the migration also fixes databases that already had it.
+drop index if exists sessions_token_hash_idx;
+
 create index if not exists sessions_user_id_idx on sessions (user_id);
+-- The hourly sweep deletes on expires_at. Without this it was a full table
+-- scan: EXPLAIN over 20k sessions planned a Seq Scan touching 10941 rows to
+-- find the expired ones, and the cost grows linearly with retained logins.
+create index if not exists sessions_expires_at_idx on sessions (expires_at);
 -- No users_email_idx: `email text unique` already creates one.
 
 -- Single-use password reset tokens. Only the SHA-256 digest is stored, and a

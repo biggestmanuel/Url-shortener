@@ -129,6 +129,37 @@ exist: `--primary`, `--primary-hover`, `--primary-subtle`, `--primary-border`,
 `--border-strong`, `--border-focus`. Before adding a token, define it in
 **both** `:root` and `body.dark`.
 
+## 1.9 Indexes are not optional, and neither is removing the wrong ones
+
+Both mistakes here are silent: no error, no failing test, just a slower app
+until one day it isn't.
+
+- **Don't index a column that a `unique` constraint already indexes.**
+  `token_hash text unique` creates `sessions_token_hash_key` on its own. A
+  second `create index ... on sessions (token_hash)` meant every login — the
+  hottest write in the app — maintained two identical b-trees for no query
+  benefit.
+- **Do index every column a maintenance sweep filters on.** The hourly
+  expired-session sweep deletes on `sessions.expires_at`. Unindexed, `EXPLAIN`
+  over 20k sessions planned a sequential scan touching 10941 rows, and the cost
+  grows linearly with retained logins.
+- **Index foreign keys.** Postgres does not create these. `sessions.user_id`
+  and `links.user_id` cascade on user delete; without an index each delete
+  scans the child table.
+- **Include the sort column in a composite index.** `links_user_id_idx` is
+  `(user_id, created_at desc)` so the dashboard's `ORDER BY created_at DESC`
+  needs no sort. Splitting it into `(user_id)` forces a full sort of every
+  matching row.
+
+`backend/test/schema.test.js` enforces all four. When you add a column or an
+index, run `npm --prefix backend run db:migrate` (idempotent) and the suite
+will tell you if you duplicated or forgot something.
+
+Note that the guard checks the index **on the table being swept**. An index on
+`password_resets(expires_at)` says nothing about `sessions`, and a version of
+that check which pooled columns across all tables passed with no
+`sessions.expires_at` index at all.
+
 # 2. Traps in this stack
 
 These cost real time. They are not obvious.
@@ -240,6 +271,12 @@ binds a port.
 `backend/test/assets.test.js` does the same for the frontend's silent
 failures: undefined CSS custom properties, themes that disagree about which
 tokens exist, and files `index.html` references that are not there.
+
+`backend/test/schema.test.js` covers the index hygiene in section 1.9. When
+you add a regression test for a *bug* rather than a shape, call the real
+function — an earlier test duplicated a regex from `escape.js` into the test
+body, so it kept passing even when `escape.js` stopped matching on any of the
+payloads it claimed to cover.
 
 Two things follow from that:
 

@@ -372,6 +372,7 @@ backend/
     codes.test.js        # Code generation, distribution, validation
     config.test.js       # Deployment-config checks and the production fail-fast
     assets.test.js       # CSS custom properties, theme parity, referenced files
+    schema.test.js       # Index hygiene: no redundant indexes, every FK and sweep indexed
     invariants.guard.test.js # Structural guards for the AGENTS.md invariants
     shutdown.test.js     # Graceful SIGTERM drain
 ```
@@ -408,7 +409,10 @@ proves nothing. Revert the fix, watch it fail, restore. Do this for every bug fi
 
 - Short codes use **rejection sampling** rather than `byte % 62`, which would bias the first characters of every code.
 - Link creation is a single `INSERT` relying on the unique index for collision detection, so the old check-then-insert race (which surfaced as a `500`) is gone — a duplicate alias is a clean `409`.
-- The redirect is a single `UPDATE ... RETURNING`, not a `SELECT` followed by an `UPDATE`.
+- The redirect is a single `UPDATE ... RETURNING`, not a `SELECT` followed by an `UPDATE`. Its click counter **saturates** at the `integer` ceiling rather than overflowing into a `500` on every subsequent click.
+- `sessions` carries no index on `token_hash`: the `unique` constraint already creates one, and a second identical b-tree just meant every login maintained both. The expired-session sweep filters on `expires_at`, which *is* indexed — unindexed, `EXPLAIN` over 20k sessions planned a sequential scan touching 10941 rows, hourly, forever.
+- `backend/test/schema.test.js` keeps that honest: no index may duplicate a `unique` constraint, every foreign key must be indexed (Postgres does not do this for you), and every column a maintenance sweep filters on must have an index **on that table**.
+- The click counter is incremented with a write on every hit, which makes a redirect non-idempotent: a proxy or browser retry double-counts. That is inherent to server-side click tracking, not a bug to fix here.
 - `POST /api/links` no longer needs a dedicated pooled connection or an explicit transaction.
 - `app.get('/:code')` validates the code shape before touching the database and yields to a JSON `404` for anything that isn't a short code, so `/favicon.ico` and friends never hit Postgres.
 - Exports use `Blob` + `URL.createObjectURL` rather than `encodeURI` data URIs, which cannot represent `#` or newlines safely.
