@@ -44,6 +44,7 @@
   --danger-border: #fecaca;
   --warning: #f59e0b;
   --warning-bg: #fffbeb;
+  --warning-border: #fde68a;
 
   /* Shadow & Elevation */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -103,6 +104,7 @@ body.dark {
   --danger-border: rgba(248, 113, 113, 0.25);
   --warning: #fbbf24;
   --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-border: rgba(251, 191, 36, 0.25);
 
   /* Shadows in Dark */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
@@ -352,6 +354,17 @@ button:disabled {
 }
 .status-local .status-indicator {
   background-color: var(--primary);
+}
+
+/* API reachable but its database is unavailable: an outage, not a mode. */
+.status-warning {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning);
+}
+.status-warning .status-indicator {
+  background-color: var(--warning);
+  animation: pulse 1.2s infinite ease-in-out;
 }
 
 /* Icon Buttons */
@@ -1512,6 +1525,133 @@ kbd {
 .qr-modal-hint {
   font-size: 0.78rem;
   color: var(--text-subtle);
+}
+
+.qr-meta {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--text-subtle);
+  opacity: 0.75;
+  margin-top: 6px;
+}
+
+/* Account Button in the Top Bar */
+.auth-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Text-only button used inside forms and the verify banner */
+.link-button {
+  align-self: center;
+  padding: 2px 0;
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.link-button:hover:not(:disabled) {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.link-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Unverified-address notice, shown under the nav */
+.verify-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 20px;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  background: var(--primary-subtle);
+  border-bottom: 1px solid var(--primary-border);
+}
+
+.verify-banner[hidden] {
+  display: none;
+}
+
+/* Auth Modal Specifics */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.auth-tab {
+  flex: 1;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-lg) - 4px);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.auth-tab:hover:not(.active) {
+  color: var(--text-main);
+}
+
+.auth-tab.active {
+  color: var(--text-main);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+#authForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#authForm[hidden] {
+  display: none;
+}
+
+#authForm input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: var(--text-main);
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: var(--transition-fast);
+}
+
+#authForm input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.auth-hint {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+  margin: 0;
 }
 
 /* Share Modal Specifics */

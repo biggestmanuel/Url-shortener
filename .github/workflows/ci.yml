@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Nothing here needs the token to write. Granting only read access means a
+# compromised action or a malicious test cannot push to the repository.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22+: `node --test` auto-discovery and the glob-free test
+      # invocation in package.json rely on it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend
+
+      # Fail on high/critical advisories in the production dependency tree.
+      # devDependencies are excluded: a vulnerable test-only package is a much
+      # smaller risk than one that ships, and a strict check here tends to get
+      # ignored once it blocks unrelated work.
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm audit --prefix backend --omit=dev --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Optional: proves schema.sql is safe to re-run against a database that
+      # has already been migrated, and that the running code finds every table
+      # and column it expects. Skipped unless a throwaway CI database is
+      # configured, so the default pipeline needs no secrets.
+      - name: Verify the schema is idempotent
+        if: ${{ secrets.CI_DATABASE_URL != '' }}
+        run: npm --prefix backend run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+
+      # Catches the deployment settings that fail silently: the server boots,
+      # reports healthy, and hands out links nobody can open. Runs without
+      # secrets too — the database half simply reports what it can reach.
+      - name: Deployment doctor
+        run: npm --prefix backend run doctor
+        env:
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}

@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="dark">
+<body>
   <!-- Ambient background lighting -->
   <div class="bg-glow bg-glow-1" aria-hidden="true"></div>
   <div class="bg-glow bg-glow-2" aria-hidden="true"></div>
@@ -43,6 +43,27 @@
           <span class="status-text">Connecting...</span>
         </div>
 
+        <!-- Unverified-address notice, shown only to a signed-in user. -->
+        <div id="verifyBanner" class="verify-banner" role="status" hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span id="verifyBannerText">Your email address is not confirmed yet.</span>
+          <button id="verifyResendBtn" class="link-button" type="button">Resend email</button>
+        </div>
+
+        <div id="authArea" class="auth-area">
+          <button id="authTrigger" class="btn-secondary btn-sm" type="button" title="Sign in to sync your links">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span id="authTriggerLabel">Sign in</span>
+          </button>
+        </div>
+
         <button id="theme" class="icon-btn" type="button" aria-label="Toggle theme" title="Toggle theme">
           <svg class="sun-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="5"></circle>
@@ -60,7 +81,9 @@
           </svg>
         </button>
 
-        <a href="https://github.com/biggestmanuel/url-shortener" target="_blank" rel="noopener noreferrer" class="icon-btn github-btn" aria-label="View on GitHub" title="View Source on GitHub">
+        <!-- Shown only when localStorage has linkly.repoUrl set, so the page never
+             points at an unrelated repository. -->
+        <a id="githubLink" href="#" target="_blank" rel="noopener noreferrer" class="icon-btn github-btn" aria-label="View on GitHub" title="View Source on GitHub" hidden>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
           </svg>
@@ -385,7 +408,7 @@
               </svg>
             </div>
             <h3>Instant Redirection</h3>
-            <p>High performance base62 encoded short links with lightning fast 302 redirects and resilient caching.</p>
+            <p>Randomized base62 short codes that resist enumeration, with fast 302 redirects served <code>no-store</code> so shared caches never cross-contaminate visitors.</p>
           </div>
 
           <div class="feature-card">
@@ -442,9 +465,96 @@
     </div>
   </footer>
 
+  <!-- Modal: Sign in / Register -->
+  <div id="authModal" class="modal-backdrop" hidden>
+    <div class="modal-card modal-sm" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <h3 id="authModalTitle">Sign in</h3>
+        </div>
+        <button id="closeAuthModal" class="modal-close-btn" type="button" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="auth-tabs" role="tablist">
+          <button id="authTabSignIn" class="auth-tab active" type="button" role="tab" aria-selected="true">Sign in</button>
+          <button id="authTabRegister" class="auth-tab" type="button" role="tab" aria-selected="false">Create account</button>
+        </div>
+
+        <form id="authForm" novalidate>
+          <label class="sr-only" for="authEmail">Email</label>
+          <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" spellcheck="false" required>
+
+          <label class="sr-only" for="authPassword">Password</label>
+          <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" minlength="8" required>
+
+          <p class="auth-hint" id="authHint">Your links follow you across browsers and devices.</p>
+
+          <div id="authError" class="form-alert error-alert" role="alert" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span id="authErrorMessage"></span>
+          </div>
+
+          <button id="authSubmit" class="btn-primary w-full" type="submit">
+            <span class="btn-text">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span id="authSubmitLabel">Sign in</span>
+            </span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+
+          <button id="authForgotBtn" class="link-button" type="button">Forgot your password?</button>
+        </form>
+
+        <!-- Step 2 of the password reset: the emailed token sets a new password. -->
+        <form id="resetForm" novalidate hidden>
+          <p class="auth-hint" id="resetHint">Paste the token from your reset email.</p>
+
+          <label class="sr-only" for="resetToken">Reset token</label>
+          <input id="resetToken" type="text" placeholder="Reset token from the email" autocomplete="off" spellcheck="false" required>
+
+          <label class="sr-only" for="resetPassword">New password</label>
+          <input id="resetPassword" type="password" placeholder="New password (min 8 characters)" autocomplete="new-password" minlength="8" required>
+
+          <div id="resetError" class="form-alert error-alert" role="alert" hidden>
+            <span id="resetErrorMessage"></span>
+          </div>
+
+          <button id="resetSubmit" class="btn-primary w-full" type="submit">
+            <span class="btn-text">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Set new password
+            </span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+
+          <button id="resetBackBtn" class="link-button" type="button">Back to sign in</button>
+        </form>
+
+        <button id="authSignOut" class="btn-secondary w-full" type="button" hidden>
+          Sign out of <span id="authEmailLabel"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: QR Code Preview & Download -->
   <div id="qrModal" class="modal-backdrop" hidden>
-    <div class="modal-card">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <div class="modal-icon-box">
@@ -455,7 +565,7 @@
               <rect x="3" y="14" width="7" height="7"></rect>
             </svg>
           </div>
-          <h3>QR Code Generator</h3>
+          <h3 id="qrModalTitle">QR Code Generator</h3>
         </div>
         <button id="closeQrModal" class="modal-close-btn" type="button" aria-label="Close modal">×</button>
       </div>
@@ -466,10 +576,18 @@
         </div>
         <p class="qr-modal-url" id="qrModalUrl"></p>
         <p class="qr-modal-hint">Scan with any mobile camera or QR reader.</p>
+        <p class="qr-meta" id="qrMeta"></p>
       </div>
 
-      <div class="modal-footer">
-        <button id="downloadQrBtn" class="btn-primary w-full" type="button">
+      <div class="modal-footer modal-footer-split">
+        <button id="downloadQrSvgBtn" class="btn-secondary" type="button" title="Download as scalable vector">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          SVG
+        </button>
+        <button id="downloadQrBtn" class="btn-primary" type="button">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
@@ -483,7 +601,7 @@
 
   <!-- Modal: Share Link -->
   <div id="shareModal" class="modal-backdrop" hidden>
-    <div class="modal-card">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <div class="modal-icon-box">
@@ -495,7 +613,7 @@
               <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
             </svg>
           </div>
-          <h3>Share Short Link</h3>
+          <h3 id="shareModalTitle">Share Short Link</h3>
         </div>
         <button id="closeShareModal" class="modal-close-btn" type="button" aria-label="Close modal">×</button>
       </div>
@@ -538,7 +656,7 @@
 
   <!-- Modal: Delete Confirmation -->
   <div id="deleteModal" class="modal-backdrop" hidden>
-    <div class="modal-card modal-sm">
+    <div class="modal-card modal-sm" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
       <div class="modal-header">
         <div class="modal-title-wrap">
           <div class="modal-icon-box danger-icon">
@@ -547,7 +665,7 @@
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
           </div>
-          <h3>Delete Link</h3>
+          <h3 id="deleteModalTitle">Delete Link</h3>
         </div>
         <button id="closeDeleteModal" class="modal-close-btn" type="button" aria-label="Close modal">×</button>
       </div>
@@ -567,7 +685,9 @@
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <!-- App Script -->
+  <!-- Escaping helpers, QR encoder (ISO/IEC 18004), then app logic -->
+  <script src="escape.js"></script>
+  <script src="qr.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

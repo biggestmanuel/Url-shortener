@@ -1,0 +1,27 @@
+{
+  "name": "linkly",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Linkly — URL shortener and link analytics platform",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup": "npm install && npm --prefix backend install",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "npm --prefix backend test",
+    "test:watch": "npm --prefix backend run test:watch",
+    "audit": "npm audit --omit=dev --audit-level=high && npm audit --prefix backend --omit=dev --audit-level=high",
+    "check": "npm run lint && npm test && npm run audit",
+    "doctor": "npm --prefix backend run doctor",
+    "dev": "npm --prefix backend run dev",
+    "start": "npm --prefix backend start",
+    "loadtest": "npm --prefix backend run loadtest"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "globals": "^16.4.0"
+  }
+}
