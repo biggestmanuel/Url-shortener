@@ -279,13 +279,46 @@ Correctness is verified by **round-tripping every generated symbol through an in
 ## ✅ Testing & linting
 
 ```bash
-npm run check      # lint + test + audit
+npm run check           # lint + test + dependency audit + secret scan
 npm run lint
-npm test           # 247 tests, no test framework required
-npm run audit      # production dependency advisories (high/critical)
-npm run doctor     # deployment config + schema preflight
-npm run loadtest   # k6, from backend/loadtest/linkly.js
+npm test                # 258 tests, no test framework required
+npm run audit           # production dependency advisories (high/critical)
+npm run audit:secrets   # scans every blob + commit message in the history
+npm run doctor          # deployment config + schema preflight
+npm run loadtest        # k6, from backend/loadtest/linkly.js
 ```
+
+## 🔑 Secret exposure
+
+This repository is **public**, so a credential that reaches a commit is a leaked credential from
+the moment it is pushed — and deleting it in a later commit does not undo that, because the object
+stays in history, and forks and caches may already have it.
+
+`npm run audit:secrets` walks every blob reachable from every ref, every unreachable object in the
+store, and every commit message, looking for credential shapes (Neon passwords, inline-password
+Postgres URLs, Supabase service-role keys, AWS/GitHub/Slack/Stripe/npm/SendGrid/Twilio tokens,
+private key blocks). When a local `backend/.env` exists it additionally compares against the exact
+live values and treats an exact match as fatal.
+
+Two properties make the report trustworthy rather than decorative:
+
+- **It never prints the secret.** A finding reports the file, line, blob sha and pattern name. A
+  scanner that echoes the credential into a CI log has moved the problem.
+- **The scanner is itself tested.** `backend/test/secrets.test.js` plants a dozen known-bad strings
+  in a throwaway repository and asserts each is detected, asserts documentation and placeholder
+  values are *not* flagged, and asserts the report contains no secret value. A scanner that silently
+  matches nothing looks identical to a clean repository, so "clean" only means something once the
+  detector is proven.
+
+Both the dependency audit and the secret scan run in CI.
+
+The history has been audited: **no live secret and no credential-shaped string in any blob or commit
+message.** `backend/.env` has never been tracked, and the deleted `backend/lib/supabase.js` read its
+credentials from `process.env` rather than hardcoding them.
+
+⚠️ If a scan ever does fail, treat it as a real leak: rotate the credential **first**, then rewrite
+history if it matters, because the fix and the rotation are independent and only rotation actually
+revokes it.
 
 `npm run audit` runs in CI too, so a vulnerable production dependency fails the build instead of quietly accumulating. It covers **both** projects and checks **production dependencies only** — a vulnerable dev-only package is a much smaller risk, and a gate that blocks on those tends to get bypassed. Fix those separately with `npm audit fix`.
 

@@ -60,4 +60,22 @@ export default [
       },
     },
   },
+  {
+    // Repository-level Node scripts (the secret scanner). Plain ESM run by
+    // hand, so they are outside both the browser and the backend/test globs.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      eqeqeq: ['error', 'smart'],
+      'prefer-const': 'error',
+      'no-var': 'error',
+    },
+  },
 ];

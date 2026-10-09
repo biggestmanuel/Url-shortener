@@ -241,7 +241,7 @@ disable — `SESSION_SWEEP_MINUTES` uses `nonNegativeEnv()` for that reason.
 The full gate, from the repository root:
 
 ```bash
-npm run check     # lint + all tests + production-dependency audit
+npm run check     # lint + all tests + production-dependency audit + secret scan
 npm run doctor    # deployment config + schema + connection preflight
 ```
 
@@ -252,11 +252,65 @@ Non-negotiable expectations:
 - **`npm audit --omit=dev` reports 0 vulnerabilities** in both trees. The CI
   gate is production deps only; don't introduce a new dependency casually, and
   don't "fix" an audit by widening the gate.
+- **`npm run audit:secrets` reports no findings.** This repository is public,
+  so a credential in a commit is leaked from the moment it is pushed, and a
+  later deletion does not revoke it.
 - No `probe.mjs` / scratch files left behind.
 - No background `node` processes still listening.
 - The database is back to empty.
 - No secrets committed. `.env` is gitignored; `.env.example` must never
   contain a real value.
+
+### Never run `npm audit fix --omit=dev` here
+
+It **deletes devDependencies** to satisfy a production-only report — it would
+remove `jsdom` and `jsqr` and silently gut the frontend and QR test suites.
+When a transitive advisory appears, update that one package within the range
+its parent already allows (`npm --prefix backend update <pkg>`), and check
+`git diff` afterwards to confirm only the lockfile entry moved.
+
+For example `proxy-addr` (via Express) had a critical IP-spoofing advisory.
+Express 4.22.3 requires `~2.0.7`, which already permits the fixed 2.0.8, so
+the correct fix was one package and seven lockfile lines — not a migration to
+Express 5 and not a dependency purge.
+
+### If the secret scan ever fails
+
+Rotate the credential **first**, then decide whether to rewrite history. Those
+are independent: rotation is what actually revokes it, and history rewriting is
+cosmetic if the value was already public. Do the rotation even if you rewrite.
+
+### After every file change, commit and push
+
+Do not leave a session's work sitting in the working tree. Once a change is
+made and verified, commit it and push it, then move on. Concretely:
+
+1. Make the change.
+2. Run the gate above (`npm run check`).
+3. `git add -A`
+4. `node scripts/audit-secrets.mjs` — confirm the staged index is clean.
+5. `git commit`
+6. `git push origin main`
+
+This is not a style preference. Two things in this repository's own history
+came from uncommitted work: a live `API_KEY` sat in a test fixture across
+several rounds, and four commits sat unpushed while the remote drifted. Both
+were caught late rather than early. An uncommitted change has no audit trail,
+no guard ran against it, and no timestamp saying when it was made.
+
+Run the secret scan on the **staged index** at step 4, before committing rather
+than after. `git commit --amend` can rewrite a commit to remove a value, but
+the object still sits in the store, and if the commit was already pushed it is
+already public. Checking the index is the last point where a leak is still
+cheap.
+
+Expect the push to be **rejected** if the diff contains a credential-shaped
+string. GitHub push protection is stricter than the scanner in this repository
+and will refuse on a planted fixture even though the value is obviously fake.
+That is not a false positive to work around by clicking "unblock" — build the
+fixture from fragments instead, the way `plant()` in
+`backend/test/secrets.test.js` does. If a push is rejected, read the violation
+before retrying; do not retry unchanged.
 
 ## 3.0 The invariants above are enforced, not just documented
 
@@ -277,6 +331,22 @@ you add a regression test for a *bug* rather than a shape, call the real
 function — an earlier test duplicated a regex from `escape.js` into the test
 body, so it kept passing even when `escape.js` stopped matching on any of the
 payloads it claimed to cover.
+
+`backend/test/secrets.test.js` does the same for `scripts/audit-secrets.mjs`:
+it plants a dozen known-bad strings in a throwaway repository and asserts each
+one is detected. Two real defects were found this way and would otherwise have
+shipped:
+
+- The scanner's `npg_` pattern required 20 characters after the prefix. The
+  actual Neon password on this project is 14 — the scanner would have reported
+  the repo clean while missing the one credential that actually mattered.
+- It treated any `.env` value over 12 characters as a live secret, so
+  `PUBLIC_BASE_URL=http://localhost:3001` matched 43 times across the code and
+  docs. A scanner that cries wolf gets switched off; that fix required an
+  entropy floor and an explicit "configuration is not a credential" list.
+
+Never write a scanner or a guard you have not seen fail. "It says clean" is
+only evidence if "it says dirty" has been demonstrated.
 
 Two things follow from that:
 

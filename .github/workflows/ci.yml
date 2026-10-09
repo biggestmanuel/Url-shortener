@@ -47,6 +47,13 @@ jobs:
       - name: Test
         run: npm test
 
+      # Scans every blob and commit message in the history for credentials.
+      # This repository is public, so a committed secret is a leaked secret
+      # from the moment it is pushed - and deleting it later does not undo it.
+      # Needs no secrets to run.
+      - name: Scan history for committed secrets
+        run: npm run audit:secrets
+
       # Optional: proves schema.sql is safe to re-run against a database that
       # has already been migrated, and that the running code finds every table
       # and column it expects. Skipped unless a throwaway CI database is
