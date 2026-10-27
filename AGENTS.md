@@ -134,6 +134,14 @@ exist: `--primary`, `--primary-hover`, `--primary-subtle`, `--primary-border`,
 Both mistakes here are silent: no error, no failing test, just a slower app
 until one day it isn't.
 
+## 1.10 Public routes stay public
+
+Routes that are intentionally public (no accounts by design) must be documented
+as such in `README.md` and protected with rate limits, input limits, and
+spending caps instead of auth. Never add auth to a public route without asking
+the operator first — public-by-design is an architectural decision, not an
+oversight to fix.
+
 - **Don't index a column that a `unique` constraint already indexes.**
   `token_hash text unique` creates `sessions_token_hash_key` on its own. A
   second `create index ... on sessions (token_hash)` meant every login — the
@@ -238,6 +246,12 @@ disable — `SESSION_SWEEP_MINUTES` uses `nonNegativeEnv()` for that reason.
 
 # 3. Before you commit
 
+Automate everything that can be automated: tests, lint, builds, audits, scans,
+migration checks, and repeated manual steps. Run them and report results.
+Never automate irreversible or outward-facing actions — merging, deploying,
+deleting data, force-pushing, spending money, sending messages. Those require
+explicit approval before they run.
+
 The full gate, from the repository root:
 
 ```bash
@@ -280,23 +294,45 @@ Rotate the credential **first**, then decide whether to rewrite history. Those
 are independent: rotation is what actually revokes it, and history rewriting is
 cosmetic if the value was already public. Do the rotation even if you rewrite.
 
-### After every file change, commit and push
+## 3.1 Git workflow (branch and pull request, never push to `main`)
 
-Do not leave a session's work sitting in the working tree. Once a change is
-made and verified, commit it and push it, then move on. Concretely:
+Never commit or push directly to `main`. `main` receives merges only. Work on a
+branch from an up-to-date `main`:
+
+```bash
+git switch main
+git pull
+git switch -c <short-descriptive-name>
+# make the change, run the gate, commit
+git push -u origin <branch>
+```
+
+Commit and push to your branch after every coherent change — one change, one
+commit, pushed, then move on. Do not batch unrelated work and do not leave work
+uncommitted. A commit is one coherent change that leaves the repo consistent,
+not one file and not one keystroke. Never commit a half-finished refactor. Two
+unrelated fixes means two commits. Refactoring beside a bug fix is a separate
+commit.
+
+Merging: when you believe the branch is ready, say so, with your reasoning, CI
+status, and a summary of the diff. Open the PR and wait. Merge only after the
+user explicitly confirms. Before asking, confirm CI is green and the diff
+matches your report.
+
+Reverting is a commit. History is append-only. If a pushed commit was wrong, add
+a commit that undoes it and say in the message what was wrong.
+
+Before committing, run the full gate:
 
 1. Make the change.
-2. Run the gate above (`npm run check`).
+2. Run `npm run check` — lint, all tests, production-dependency audit, secret
+   scan. A commit that fails them does not happen. Fix it, or explain in the
+   commit message why the exception is correct. No `--no-verify` without a
+   documented reason.
 3. `git add -A`
 4. `node scripts/audit-secrets.mjs` — confirm the staged index is clean.
 5. `git commit`
-6. `git push origin main`
-
-This is not a style preference. Two things in this repository's own history
-came from uncommitted work: a live `API_KEY` sat in a test fixture across
-several rounds, and four commits sat unpushed while the remote drifted. Both
-were caught late rather than early. An uncommitted change has no audit trail,
-no guard ran against it, and no timestamp saying when it was made.
+6. `git push -u origin <branch>`
 
 Run the secret scan on the **staged index** at step 4, before committing rather
 than after. `git commit --amend` can rewrite a commit to remove a value, but
@@ -311,6 +347,11 @@ That is not a false positive to work around by clicking "unblock" — build the
 fixture from fragments instead, the way `plant()` in
 `backend/test/secrets.test.js` does. If a push is rejected, read the violation
 before retrying; do not retry unchanged.
+
+> **Note on work already done:** Several commits were committed and pushed
+> directly to `main` before these rules were in place (commits `b84e18e`,
+> `761f68c`, `1f712e1`). Going forward, all work must be on branches and merged
+> via PR.
 
 ## 3.0 The invariants above are enforced, not just documented
 
